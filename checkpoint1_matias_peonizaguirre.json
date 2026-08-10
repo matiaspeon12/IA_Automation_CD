@@ -1,0 +1,207 @@
+{
+  "name": "checkpoint1_matias_peonizaguirre",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -352,
+        -400
+      ],
+      "id": "02bd0ffc-efe0-4dba-9bf4-1e9ec29c7c2e",
+      "name": "Chat Trigger",
+      "webhookId": "8573ce7a-8e19-45c5-bdb7-6352caf8ab0f"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "=# ROL Y PERFIL\nEres un Asistente Especializado en Calificación de Leads y Gestión de Contactos Operativos.\n\n# ÁMBITO DE ACTUACIÓN\nOperas exclusivamente en la etapa de recepción y filtrado inicial de contactos comerciales.\n\n# OBJETIVO PRINCIPAL\n1. Comprender la necesidad del usuario.\n2. Si la consulta incluye datos de contacto (Nombre, Email, Empresa/Interés), registra los datos activando la herramienta 'Google Sheets Lead Tracker'.\n3. Responder confirmando la gestión realizada o solicitando datos faltantes.\n\n# REGLAS Y LIMITACIONES\n- NO inventes datos de contacto.\n- NO cotices ni prometas precios.\n- Si la consulta no es comercial o requiere soporte técnico avanzado, escala amablemente hacia un representante humano.",
+          "maxIterations": 2
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        -112,
+        -400
+      ],
+      "id": "1e2bf8cc-a497-4cc9-be23-5c46ffbc6273",
+      "name": "AI Agent (Motor de Razonamiento)"
+    },
+    {
+      "parameters": {
+        "sendTo": "matiaspeon12@gmail.com",
+        "subject": "=[AUDITORÍA M1] Ejecución de Agente IA - Session Logs",
+        "message": "=### REPORT DE OBSERVABILIDAD - AGENTE BASE (M1)\n\n- **Timestamp:** {{ $now.format('YYYY-MM-DD HH:mm:ss') }}\n- **Entrada del Usuario:** {{ $('Chat Trigger').item.json.chatInput }}\n- **Respuesta Final del Agente:** {{ $json.output }}\n- **Estado de Ejecución:** Exitoso\n\n--- \n*Este reporte automático audita el pensamiento del modelo y la activación de herramientas en producción.*",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        208,
+        -400
+      ],
+      "id": "70e6cb1e-6587-44aa-a763-92c888c08759",
+      "name": "Log de Control (Gmail Observabilidad)",
+      "webhookId": "b20a9ee1-ec20-43b2-a06c-785eeba16dc7",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D9XLF3ppzyWzdeQw",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Utiliza esta herramienta EXCLUSIVAMENTE cuando el usuario proporcione información explicita de un nuevo contacto o lead (incluyendo al menos Nombre y Email o Empresa). Esta herramienta registra la entrada en la planilla oficial de seguimiento comercial para que el equipo de ventas tome acción",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1b7LZTTyXC6C0Kk3u_9TvEy4ZBysnljdX_PButak46V0/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1b7LZTTyXC6C0Kk3u_9TvEy4ZBysnljdX_PButak46V0/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Nombre",
+              "displayName": "Nombre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Empresa",
+              "displayName": "Empresa",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        208,
+        -144
+      ],
+      "id": "60b0d050-0974-4090-80a9-977cc90492aa",
+      "name": "Append row in sheet in Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "3H04j9s9OmJYzJtV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -256,
+        -192
+      ],
+      "id": "f03d6745-e8b1-4ada-83eb-fb431a14a39e",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "E6qPzkAcy5YIlKii",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "AI Agent (Motor de Razonamiento)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent (Motor de Razonamiento)": {
+      "main": [
+        [
+          {
+            "node": "Log de Control (Gmail Observabilidad)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet in Google Sheets": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent (Motor de Razonamiento)",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent (Motor de Razonamiento)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "8027bf4a-16b2-4b10-8268-12be44bd9f01",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "412e8a3a482fb7dda0fe855b6f1d8e950a244984215d34bfcb3c8e94ba12675c"
+  },
+  "id": "g06oetveonOrBPUR",
+  "tags": []
+}
