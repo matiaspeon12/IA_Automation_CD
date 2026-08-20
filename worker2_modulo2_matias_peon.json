@@ -1,0 +1,82 @@
+{
+  "name": "worker2_modulo2_peon_matias",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        -224,
+        -128
+      ],
+      "id": "950836fa-465c-411d-845b-1391aefdcde5",
+      "name": "Execute Workflow Trigger"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "t1",
+              "name": "ticket_id",
+              "value": "=TCK-{{ $now.format('X') }}",
+              "type": "string"
+            },
+            {
+              "id": "t2",
+              "name": "status",
+              "value": "success",
+              "type": "string"
+            },
+            {
+              "id": "t3",
+              "name": "worker_id",
+              "value": "worker_tech_support",
+              "type": "string"
+            },
+            {
+              "id": "t4",
+              "name": "data.resolution",
+              "value": "Ticket derivado a ingeniería Nivel 2.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        -128
+      ],
+      "id": "adb44ae2-f2ae-4219-b1a4-91cb55bcf07d",
+      "name": "Return Contract (JSON)"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Return Contract (JSON)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "327db458-bb2e-4e30-a581-d633bb1302b1",
+  "meta": {
+    "instanceId": "412e8a3a482fb7dda0fe855b6f1d8e950a244984215d34bfcb3c8e94ba12675c"
+  },
+  "id": "sKhqHBPrUIur1fOT",
+  "tags": []
+}
