@@ -1,0 +1,371 @@
+{
+  "name": "manager_modulo2_peon_matias",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1104,
+        128
+      ],
+      "id": "5b8a4501-90d5-43c6-b91d-3873c311b805",
+      "name": "Chat Trigger",
+      "webhookId": "2d2751c4-aec6-499a-a25b-35bb0e7fd3e4"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "=# ROL\nEres el Agente Manager Orquestador de Operaciones.\n\n# OBJETIVO\nClasificar la solicitud del usuario en UNA de las siguientes categorías estrictas:\n- SALES: Si el usuario busca cotizaciones, contratar servicios o registrarse como nuevo lead.\n- SUPPORT: Si el usuario reporta un error técnico o consulta sobre un servicio ya activo.\n- ESCALATE: Si la solicitud es ambigua, fuera de alcance, o exige un humano.\n\n# FORMATO DE SALIDA\nDebes responder ÚNICAMENTE un objeto JSON válido con esta estructura:\n{\n  \"intent\": \"SALES\" | \"SUPPORT\" | \"ESCALATE\",\n  \"client_name\": \"Nombre extraído o Desconocido\",\n  \"client_email\": \"Email extraído o Desconocido\",\n  \"message_body\": \"Resumen del mensaje original\"\n}",
+          "maxIterations": 5
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        -912,
+        128
+      ],
+      "id": "596e3655-85d9-4100-8b8b-0b46ef8836fe",
+      "name": "Manager Triaje (Intent Classifier)"
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -720,
+        400
+      ],
+      "id": "2cfc4bec-1176-41b2-90ab-69b52cb13c7f",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "E6qPzkAcy5YIlKii",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ JSON.parse($json.output.replace(/```json|```/g, '').trim()).intent }}",
+                    "rightValue": "SALES",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "7a565f87-13a0-4008-96dd-33980012e857"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "SALES"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ JSON.parse($json.output.replace(/```json|```/g, '').trim()).intent }}",
+                    "rightValue": "SUPPORT",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "5d7fe4ee-189b-4d0c-b2bd-5dc297e0de4e"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "SUPPORT"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -544,
+        112
+      ],
+      "id": "daf98993-1d4c-44cd-9ce9-b36e0608c8be",
+      "name": "Router de Taxonomía"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1",
+              "name": "client_name",
+              "value": "={{ JSON.parse($('Manager Triaje (Intent Classifier)').item.json.output.replace(/```json|```/g, '').trim()).client_name }}",
+              "type": "string"
+            },
+            {
+              "id": "f2",
+              "name": "client_email",
+              "value": "={{ JSON.parse($('Manager Triaje (Intent Classifier)').item.json.output.replace(/```json|```/g, '').trim()).client_email }}",
+              "type": "string"
+            },
+            {
+              "id": "f3",
+              "name": "message_body",
+              "value": "={{ JSON.parse($('Manager Triaje (Intent Classifier)').item.json.output.replace(/```json|```/g, '').trim()).message_body }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -256,
+        16
+      ],
+      "id": "b4305132-8e73-46e7-bf8e-bf11142f05f0",
+      "name": "Filtro Payload (Sales)"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "PvwiddbsYxrMQ4nZ",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/PvwiddbsYxrMQ4nZ",
+          "cachedResultName": "worker1_modulo2_peon_matias"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        -64,
+        16
+      ],
+      "id": "f8e9dad6-b2b1-401c-bb8a-d06cbcc25816",
+      "name": "Call Worker 1 (Leads Sheets)"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "client_email",
+              "value": "={{ JSON.parse($('Manager Triaje (Intent Classifier)').item.json.output.replace(/```json|```/g, '').trim()).client_email }}",
+              "type": "string"
+            },
+            {
+              "id": "s2",
+              "name": "ticket_body",
+              "value": "={{ JSON.parse($('Manager Triaje (Intent Classifier)').item.json.output.replace(/```json|```/g, '').trim()).message_body }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -256,
+        208
+      ],
+      "id": "d1946703-9cc3-42d0-89f1-2964ff183980",
+      "name": "Filtro Payload (Support)"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "sKhqHBPrUIur1fOT",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/sKhqHBPrUIur1fOT",
+          "cachedResultName": "worker2_modulo2_peon_matias"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        -64,
+        208
+      ],
+      "id": "df54b804-cedb-4dfb-aeb7-a96fa034ac2d",
+      "name": "Call Worker 2 (Support Ticket)"
+    },
+    {
+      "parameters": {
+        "sendTo": "matiaspeon12@gmail.com",
+        "subject": "=[AUDITORÍA M2] Multi-Agente Trazabilidad Log",
+        "message": "==### LOG DE ORQUESTACIÓN MULTI-AGENTE (M2)\n\n- **Execution ID:** {{ $execution.id }}\n- **Timestamp:** {{ $now.format('YYYY-MM-DD HH:mm:ss') }}\n- **Input Original:** {{ $('Chat Trigger').item.json.chatInput }}\n- **Intención Detectada:** {{ JSON.parse($('Manager Triaje (Intent Classifier)').item.json.output.replace(/```json|```/g, '').trim()).intent }}\n- **Worker / Herramienta Invocada:** {{ $json.worker_id || 'Fallback Humano' }}\n- **Estado de Ejecución:** {{ $json.status || 'Completado con éxito' }}\n- **Payload Devuelto por el Worker:** {{ JSON.stringify($json.data || $json, null, 2) }}\n\n---\n*Este reporte automático audita la ejecución y el uso de herramientas/sub-workflows en producción.*",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        192,
+        128
+      ],
+      "id": "129d3d01-4156-4976-b10c-7d58128f38bd",
+      "name": "Log Trazabilidad (Audit)",
+      "webhookId": "ce0dafd8-9a97-4aeb-9bd2-6e6696f09bb3",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D9XLF3ppzyWzdeQw",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "Manager Triaje (Intent Classifier)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Manager Triaje (Intent Classifier)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manager Triaje (Intent Classifier)": {
+      "main": [
+        [
+          {
+            "node": "Router de Taxonomía",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Router de Taxonomía": {
+      "main": [
+        [
+          {
+            "node": "Filtro Payload (Sales)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Filtro Payload (Support)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Trazabilidad (Audit)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtro Payload (Sales)": {
+      "main": [
+        [
+          {
+            "node": "Call Worker 1 (Leads Sheets)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Worker 1 (Leads Sheets)": {
+      "main": [
+        [
+          {
+            "node": "Log Trazabilidad (Audit)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtro Payload (Support)": {
+      "main": [
+        [
+          {
+            "node": "Call Worker 2 (Support Ticket)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Worker 2 (Support Ticket)": {
+      "main": [
+        [
+          {
+            "node": "Log Trazabilidad (Audit)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "09cccc5e-55be-4cbb-b276-1ae8be73c0d0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "412e8a3a482fb7dda0fe855b6f1d8e950a244984215d34bfcb3c8e94ba12675c"
+  },
+  "id": "hkzbVc6x50vmsZQu",
+  "tags": []
+}
