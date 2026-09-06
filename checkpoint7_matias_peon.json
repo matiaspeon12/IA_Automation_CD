@@ -1,0 +1,492 @@
+{
+  "name": "checkpoint7_matias_peon",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "readStatus": "unread"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1472,
+        -160
+      ],
+      "id": "be5439fa-4fd1-4bfa-8308-23b9d732d42e",
+      "name": "Inbound Trigger (Gmail Ops)",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D9XLF3ppzyWzdeQw",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.subject || '' }}",
+              "rightValue": "Auto-reply",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "c2",
+              "leftValue": "={{ $json.from || '' }}",
+              "rightValue": "no-reply@",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1232,
+        -160
+      ],
+      "id": "c5c880eb-c656-4b04-bcd9-b2e0efbad8d5",
+      "name": "IF — Anti-Loop Guardrail"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.snippet || $json.bodyText || $json.subject }}",
+        "options": {
+          "systemMessage": "# ROL Y OBJETIVO\nEres el Manager Orquestador de Sales Ops. Clasifica la intención del mensaje entrante en una de las siguientes categorías:\n- PROSPECT_QUALIFICATION: Consultas de compra, cotización o interés comercial.\n- OBJECTION_HANDLING: Respuestas con dudas técnicas o presupuestarias de leads activos.\n- CHURN_RISK: Expresiones de descontento, pedidos de baja o rescisión de servicio.\n- ESCALATE: Casos ambiguos.\n\nResponde ÚNICAMENTE un JSON con: {\"intent\": string, \"client_name\": string, \"client_email\": string, \"company\": string, \"details\": string}",
+          "maxIterations": 5
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        -992,
+        -160
+      ],
+      "id": "1b65fbc2-ec1f-40e9-a760-4954d8fcbed4",
+      "name": "Manager Triaje (Intent Classifier)"
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -992,
+        80
+      ],
+      "id": "3640b59f-effd-4fe6-8733-530a2e779d86",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "E6qPzkAcy5YIlKii",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "p1",
+              "name": "parsed",
+              "value": "={{ JSON.parse($json.output.replace(/```json|```/g, '').trim()) }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -704,
+        -160
+      ],
+      "id": "e0961693-7a02-4fe2-b7f7-aeafa83d399f",
+      "name": "Set — Limpia Payload"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.parsed.intent }}",
+                    "rightValue": "PROSPECT_QUALIFICATION",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "QUALIFICATION"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.parsed.intent }}",
+                    "rightValue": "CHURN_RISK",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "CHURN_RISK"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -528,
+        -176
+      ],
+      "id": "97b9e885-28be-406f-be2f-152820bccd61",
+      "name": "Router de Taxonomía"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Set — Limpia Payload').item.json.parsed.details }}",
+        "options": {
+          "systemMessage": "# ROL: Auditor de Calificación B2B\nAplica la rúbrica de Scoring (0 a 100) según empleados, presupuesto y urgencia.\nDevuelve JSON: {\"lead_score\": number, \"tier\": \"TIER_1\" | \"TIER_2\" | \"UNQUALIFIED\", \"action\": string}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        -272,
+        -272
+      ],
+      "id": "68fe9b00-1261-48d6-a531-2e4fe0bc5bb3",
+      "name": "Worker 1: Calificador & Scoring"
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -272,
+        -64
+      ],
+      "id": "b5986b6d-eba4-4995-af90-3f19909e6bd3",
+      "name": "Google Gemini Chat Model (W1)",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "E6qPzkAcy5YIlKii",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1vkdd2JHXID2scymIqEpJKOf2ou6JzygbMWFSY6UDGI8/edit?usp=sharing",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1vkdd2JHXID2scymIqEpJKOf2ou6JzygbMWFSY6UDGI8/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Session_ID": "={{ $('Set — Limpia Payload').item.json.parsed.client_email }}",
+            "Nombre_Usuario": "={{ $('Set — Limpia Payload').item.json.parsed.client_name }}",
+            "Estado_del_Caso": "={{ JSON.parse($json.output.replace(/```json|```/g, '').trim()).tier }}",
+            "Resumen_Consolidado": "={{ $json.output }}",
+            "Total_Mensaje": 1
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Session_ID",
+              "displayName": "Session_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nombre_Usuario",
+              "displayName": "Nombre_Usuario",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Fecha_Actualizacion",
+              "displayName": "Fecha_Actualizacion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Resumen_Consolidado",
+              "displayName": "Resumen_Consolidado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Estado_del_Caso",
+              "displayName": "Estado_del_Caso",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Datos_Clave",
+              "displayName": "Datos_Clave",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Total_Mensaje",
+              "displayName": "Total_Mensaje",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        128,
+        -272
+      ],
+      "id": "20ba9c2c-80ce-47d4-9515-8175e2ae69d0",
+      "name": "Sheets — Log Scorecard",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "3H04j9s9OmJYzJtV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BTYH98HNJ",
+          "mode": "list",
+          "cachedResultName": "alertas-sales-ops"
+        },
+        "text": "=🚨 *[ALERTA CRÍTICA - HITL] Riesgo de Cancelación Detectado*\n\n• *Cliente:* {{ $('Set — Limpia Payload').item.json.parsed.client_name }} ({{ $('Set — Limpia Payload').item.json.parsed.client_email }})\n• *Empresa:* {{ $('Set — Limpia Payload').item.json.parsed.company }}\n• *Motivo:* {{ $('Set — Limpia Payload').item.json.parsed.details }}\n• *Acción Requerida:* Congelamiento preventivo activado. Se requiere revisión humana inmediata.",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        -272,
+        144
+      ],
+      "id": "40f3660d-c3c1-41ce-a0bc-4edb4908e8d3",
+      "name": "Slack — HITL Escalamiento Forzado",
+      "webhookId": "143486c5-a1df-4b94-885c-91fcef6a2efa",
+      "credentials": {
+        "slackApi": {
+          "id": "ONCoiDrt3WjxUrMh",
+          "name": "Slack account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Inbound Trigger (Gmail Ops)": {
+      "main": [
+        [
+          {
+            "node": "IF — Anti-Loop Guardrail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Anti-Loop Guardrail": {
+      "main": [
+        [
+          {
+            "node": "Manager Triaje (Intent Classifier)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Manager Triaje (Intent Classifier)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manager Triaje (Intent Classifier)": {
+      "main": [
+        [
+          {
+            "node": "Set — Limpia Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set — Limpia Payload": {
+      "main": [
+        [
+          {
+            "node": "Router de Taxonomía",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Router de Taxonomía": {
+      "main": [
+        [
+          {
+            "node": "Worker 1: Calificador & Scoring",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack — HITL Escalamiento Forzado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model (W1)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Worker 1: Calificador & Scoring",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Worker 1: Calificador & Scoring": {
+      "main": [
+        [
+          {
+            "node": "Sheets — Log Scorecard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "8963dfb2-b713-4581-a246-9c41aeecda50",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "412e8a3a482fb7dda0fe855b6f1d8e950a244984215d34bfcb3c8e94ba12675c"
+  },
+  "id": "cuIu1ENHLeYnbHsr",
+  "tags": []
+}
