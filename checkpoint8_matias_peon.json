@@ -1,0 +1,521 @@
+{
+  "name": "checkpoint8_matias_peon",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "q1",
+              "name": "query_usuario",
+              "value": "¿Me devuelven el dinero si el producto presenta una falla técnica de fábrica?",
+              "type": "string"
+            },
+            {
+              "id": "q2",
+              "name": "contexto_airtable",
+              "value": "Política 3.2 de Devoluciones: Reembolso total disponible dentro de los primeros 30 días únicamente si existe falla de fábrica comprobada.",
+              "type": "string"
+            },
+            {
+              "id": "q3",
+              "name": "respuesta_agente",
+              "value": "Sí, contás con reembolso total dentro de los 30 días si el producto presenta falla de fábrica (Sección 3.2).",
+              "type": "string"
+            },
+            {
+              "id": "q4",
+              "name": "reintentos",
+              "value": 0,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1312,
+        -144
+      ],
+      "id": "523e0cb1-ab1b-4a97-9f70-308781d8046a",
+      "name": "Payload Entrada (Query + Contexto + Respuesta)"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Audita la siguiente interacción:\n\n- QUERY USUARIO: {{ $json.query_usuario }}\n- CONTEXTO AIRTABLE: {{ $json.contexto_airtable }}\n- RESPUESTA AGENTE: {{ $json.respuesta_agente }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "# ROL Y OBJETIVO\nEres el Juez Analítico de Calidad (AI-as-a-Judge). Audita con rigor factual la respuesta generada por el agente operativo frente a la consulta del usuario y el contexto documental provisto.\n\n# RÚBRICA FACTUAL (1 a 5)\n- 5: Perfecta concordancia factual, cita fuentes, cero alucinación.\n- 4: Precisión sólida, variaciones leves de estilo sin alterar la verdad.\n- 3: Faltan matices, datos incompletos o ambigüedad conceptual reparable.\n- 2: Contradicción parcial o afirmaciones no respaldadas.\n- 1: Alucinación severa, falsas promesas o error grave.\n\n# UMBRALES DE VEREDICTO\n- exactitud_factual >= 4  --> estado_veredicto: \"ACEPTADO\"\n- exactitud_factual == 3  --> estado_veredicto: \"CORREGIR\"\n- exactitud_factual <= 2  --> estado_veredicto: \"RECHAZADO\"\n\nResponde ÚNICAMENTE conforme al esquema JSON estructurado forzado."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        -1072,
+        -144
+      ],
+      "id": "e7e89c8f-6d9d-47bd-8f3d-b4f685daf1eb",
+      "name": "Supervisor QA (Juez LLM)"
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -1104,
+        112
+      ],
+      "id": "6c3f101a-340c-4f7f-92fe-12de2b262d78",
+      "name": "Google Gemini (Modelo Juez)",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "E6qPzkAcy5YIlKii",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"exactitud_factual\": {\n      \"type\": \"integer\",\n      \"minimum\": 1,\n      \"maximum\": 5,\n      \"description\": \"Puntaje numérico del 1 al 5 asignado según la fidelidad factual.\"\n    },\n    \"estado_veredicto\": {\n      \"type\": \"string\",\n      \"enum\": [\"ACEPTADO\", \"CORREGIR\", \"RECHAZADO\"],\n      \"description\": \"Veredicto de enrutamiento estricto.\"\n    },\n    \"critica_diagnostico\": {\n      \"type\": \"string\",\n      \"description\": \"Crítica constructiva del fallo o confirmación de exactitud.\"\n    }\n  },\n  \"required\": [\n    \"exactitud_factual\",\n    \"estado_veredicto\",\n    \"critica_diagnostico\"\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        -928,
+        112
+      ],
+      "id": "a09de2e7-9b74-4020-8efc-b2007a61ce9e",
+      "name": "Structured Output Parser (JSON Schema)"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output.estado_veredicto }}",
+                    "rightValue": "ACEPTADO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "de613548-2e3a-4d6f-af94-2499bb592392"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ACEPTADO"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output.estado_veredicto }}",
+                    "rightValue": "CORREGIR",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "4da2d5ad-0604-4b2f-8e82-402e39228558"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "CORREGIR"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output.estado_veredicto }}",
+                    "rightValue": "RECHAZADO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "cbb9bef5-204d-45c0-9daa-da097e53c120"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "RECHAZADO"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -736,
+        -144
+      ],
+      "id": "fe66764a-0cca-4f21-b19c-8acf66bbf15d",
+      "name": "Switch — 3 Rutas de Decisión"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1vkdd2JHXID2scymIqEpJKOf2ou6JzygbMWFSY6UDGI8/edit?usp=sharing",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1vkdd2JHXID2scymIqEpJKOf2ou6JzygbMWFSY6UDGI8/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Session_ID",
+              "displayName": "Session_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nombre_Usuario",
+              "displayName": "Nombre_Usuario",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Fecha_Actualizacion",
+              "displayName": "Fecha_Actualizacion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Resumen_Consolidado",
+              "displayName": "Resumen_Consolidado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Estado_del_Caso",
+              "displayName": "Estado_del_Caso",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Datos_Clave",
+              "displayName": "Datos_Clave",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Total_Mensaje",
+              "displayName": "Total_Mensaje",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "output",
+              "displayName": "output",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -432,
+        -352
+      ],
+      "id": "79d0a563-4cce-4ac2-8350-1c837267c6fb",
+      "name": "Log Auditoría QA (Sheets / CRM)",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "3H04j9s9OmJYzJtV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "max-retries",
+              "leftValue": "={{ Number($('Payload Entrada (Query + Contexto + Respuesta)').item.json.reintentos || 0) }}",
+              "rightValue": 2,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -432,
+        -144
+      ],
+      "id": "93590fb2-2686-4f65-b718-fcc590c44c67",
+      "name": "IF — ¿Menor a 2 Reintentos?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1",
+              "name": "critica_feedback",
+              "value": "={{ $('Supervisor QA (Juez LLM)').item.json.output.critica_diagnostico }}",
+              "type": "string"
+            },
+            {
+              "id": "f2",
+              "name": "reintentos",
+              "value": "={{ Number($('Payload Entrada (Query + Contexto + Respuesta)').item.json.reintentos || 0) + 1 }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -160,
+        -144
+      ],
+      "id": "154203ed-7710-460b-a37b-b286e00bccb9",
+      "name": "Self-Healing (Feedback Loop al Agente)"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BTYH98HNJ",
+          "mode": "list",
+          "cachedResultName": "alertas-sales-ops"
+        },
+        "text": "=🛑 *[QA ESCALATION - HITL] Respuesta Rechazada por el Juez*\n\n• *Exactitud Factual:* {{ $('Supervisor QA (Juez LLM)').item.json.output.exactitud_factual }}/5\n• *Crítica del Juez:* {{ $('Supervisor QA (Juez LLM)').item.json.output.critica_diagnostico }}\n• *Query del Usuario:* {{ $('Payload Entrada (Query + Contexto + Respuesta)').item.json.query_usuario }}\n• *Respuesta Observada:* {{ $('Payload Entrada (Query + Contexto + Respuesta)').item.json.respuesta_agente }}\n\n_Ejecución en pausa pasiva aguardando resolución humana._",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        -160,
+        80
+      ],
+      "id": "a4c1322d-f4f7-4f99-9d43-2eec246ff48e",
+      "name": "Slack — Alerta HITL (Rechazo)",
+      "webhookId": "3d552e54-77ef-4241-8e2b-46189acc557b",
+      "credentials": {
+        "slackApi": {
+          "id": "ONCoiDrt3WjxUrMh",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        112,
+        80
+      ],
+      "id": "a838af8e-8549-420d-baba-ec3bf5dc3cfe",
+      "name": "Wait — Pausar Ejecución (Webhook Botones)",
+      "webhookId": "qa-hitl-approval"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Payload Entrada (Query + Contexto + Respuesta)": {
+      "main": [
+        [
+          {
+            "node": "Supervisor QA (Juez LLM)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini (Modelo Juez)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Supervisor QA (Juez LLM)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser (JSON Schema)": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Supervisor QA (Juez LLM)",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supervisor QA (Juez LLM)": {
+      "main": [
+        [
+          {
+            "node": "Switch — 3 Rutas de Decisión",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch — 3 Rutas de Decisión": {
+      "main": [
+        [
+          {
+            "node": "Log Auditoría QA (Sheets / CRM)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF — ¿Menor a 2 Reintentos?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack — Alerta HITL (Rechazo)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — ¿Menor a 2 Reintentos?": {
+      "main": [
+        [
+          {
+            "node": "Self-Healing (Feedback Loop al Agente)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack — Alerta HITL (Rechazo)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack — Alerta HITL (Rechazo)": {
+      "main": [
+        [
+          {
+            "node": "Wait — Pausar Ejecución (Webhook Botones)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "9bedc84d-e711-4eb3-8002-58b5d6cb4020",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "412e8a3a482fb7dda0fe855b6f1d8e950a244984215d34bfcb3c8e94ba12675c"
+  },
+  "id": "blAICPI6SIk7dbAc",
+  "tags": []
+}
