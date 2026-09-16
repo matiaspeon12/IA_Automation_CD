@@ -1,0 +1,595 @@
+{
+  "name": "checkpoint9_matias_peon",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -2992,
+        -16
+      ],
+      "id": "b556b6a2-3ab8-4f90-9235-3dad5cb3d6f7",
+      "name": "Chat Trigger (Inbound)",
+      "webhookId": "83278f2a-365f-4079-95b6-9b4b54fb3c8d"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "t1",
+              "name": "traceId",
+              "value": "={{ 'trc_' + $now.format('X') + '_' + $execution.id }}",
+              "type": "string"
+            },
+            {
+              "id": "t2",
+              "name": "correlationId",
+              "value": "={{ 'corr_' + ($json.chatInput ? $json.chatInput.length : '0') + '_' + $execution.id }}",
+              "type": "string"
+            },
+            {
+              "id": "t3",
+              "name": "user_query",
+              "value": "={{ $json.chatInput || 'Quiero cotizar la automatización de procesos de inventario' }}",
+              "type": "string"
+            },
+            {
+              "id": "t4",
+              "name": "startTimeMs",
+              "value": "={{ $now.toMillis() }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2768,
+        -16
+      ],
+      "id": "f36ed184-4766-411d-9d46-f790f6ffd504",
+      "name": "Generador de traceId & Timestamp"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.user_query }}",
+        "options": {
+          "systemMessage": "=[INICIO DE CONTEXTO COMPARTIDO]\nTrace ID Activo: {{ $json.traceId }}\n[FIN DEL CONTEXTO COMPARTIDO]\n\n# ROL Y OBJETIVO\nEres el Agente Manager Orquestador de Operaciones. Clasifica la intención y extrae las variables clave.\n\n# TAXONOMÍA OBLIGATORIA\n- SALES: Consultas comerciales, presupuestos o cotizaciones.\n- SUPPORT: Fallas, problemas técnicos o tickets.\n- ESCALATE: Casos ambiguos o solicitud expresa de humano.\n\n# FORMATO DE SALIDA (JSON ÚNICO)\n{\n  \"intent\": \"SALES\" | \"SUPPORT\" | \"ESCALATE\",\n  \"client_name\": \"Nombre extraído o Prospecto\",\n  \"client_email\": \"Email extraído o contacto@cliente.com\",\n  \"proposed_answer\": \"Texto de respuesta comercial o técnica estructurada para el cliente.\"\n}",
+          "maxIterations": 5
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        -2528,
+        -16
+      ],
+      "id": "d1c4d77f-bba5-4679-a189-722f3359c2b7",
+      "name": "Manager Triaje (Intent & Answer)"
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -2640,
+        208
+      ],
+      "id": "7d2ee796-e5d6-4cce-b997-eb0ab1362159",
+      "name": "Google Gemini (Manager)",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "E6qPzkAcy5YIlKii",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Audita la respuesta propuesta por el agente operativo:\n\n- QUERY ORIGINAL: {{ $('Generador de traceId & Timestamp').item.json.user_query }}\n- RESPUESTA PROPUESTA: {{ $json.output }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "# ROL Y OBJETIVO\nEres el Supervisor de Calidad y Gobernanza (AI-as-a-Judge). Audita la fidelidad factual y evalúa sesgos, alucinaciones o riesgos de seguridad en la respuesta.\n\n# RÚBRICA FACTUAL (1-5)\n- 5: Perfecta precisión, neutralidad ética y apego a políticas.\n- 4: Precisión sólida con diferencias menores de formato.\n- 3: Faltan datos o ambigüedad reparable.\n- 2: Inconsistencias o afirmaciones no verificables.\n- 1: Alucinación severa, promesa desautorizada o sesgo crítico.\n\n# UMBRALES DE VEREDICTO\n- exactitud_factual >= 4  --> estado_veredicto: \"ACEPTADO\"\n- exactitud_factual == 3  --> estado_veredicto: \"CORREGIR\"\n- exactitud_factual <= 2  --> estado_veredicto: \"RECHAZADO\""
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        -2256,
+        -16
+      ],
+      "id": "3d77efbc-fdf8-4366-8beb-7324dd37f778",
+      "name": "Supervisor QA (Juez LLM)"
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -2352,
+        208
+      ],
+      "id": "ba975a27-22a1-4642-a6e0-a663782277bf",
+      "name": "Google Gemini (Modelo Juez)",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "E6qPzkAcy5YIlKii",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"exactitud_factual\": {\n      \"type\": \"integer\",\n      \"minimum\": 1,\n      \"maximum\": 5,\n      \"description\": \"Puntaje numérico del 1 al 5 asignado por la rúbrica de auditoría factual\"\n    },\n    \"estado_veredicto\": {\n      \"type\": \"string\",\n      \"enum\": [\"ACEPTADO\", \"CORREGIR\", \"RECHAZADO\"],\n      \"description\": \"Veredicto final según el umbral de gobernanza\"\n    },\n    \"critica_diagnostico\": {\n      \"type\": \"string\",\n      \"description\": \"Justificación detallada del veredicto, hallazgos de sesgo o inconsistencias detectadas\"\n    }\n  },\n  \"required\": [\"exactitud_factual\", \"estado_veredicto\", \"critica_diagnostico\"]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        -2160,
+        208
+      ],
+      "id": "ef1d2907-d5e3-40af-8c74-4a5699eafcd8",
+      "name": "Structured Output Parser (JSON Schema)"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "promptTokensEst",
+              "value": "={{ Math.round(($('Generador de traceId & Timestamp').item.json.user_query.length + 800) / 4) }}",
+              "type": "number"
+            },
+            {
+              "id": "c2",
+              "name": "completionTokensEst",
+              "value": "={{ Math.round(($('Manager Triaje (Intent & Answer)').item.json.output.length + 150) / 4) }}",
+              "type": "number"
+            },
+            {
+              "id": "c3",
+              "name": "totalCostUsd",
+              "value": "={{ Number((((Math.round(($('Generador de traceId & Timestamp').item.json.user_query.length + 800) / 4) * 0.075) / 1000000) + ((Math.round(($('Manager Triaje (Intent & Answer)').item.json.output.length + 150) / 4) * 0.30) / 1000000)).toFixed(6)) }}",
+              "type": "number"
+            },
+            {
+              "id": "c4",
+              "name": "latencyMs",
+              "value": "={{ $now.toMillis() - $('Generador de traceId & Timestamp').item.json.startTimeMs }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1952,
+        -16
+      ],
+      "id": "ea16c1d7-f64e-46f7-a265-241779251f78",
+      "name": "Calculadora Financiera (Tokens & TCO)"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "l1",
+              "name": "structured_log",
+              "value": "={{ {\n  \"traceId\": $('Generador de traceId & Timestamp').item.json.traceId,\n  \"correlationId\": $('Generador de traceId & Timestamp').item.json.correlationId,\n  \"timestamp\": $now.toISO(),\n  \"executionId\": $execution.id,\n  \"environment\": \"production\",\n  \"nodeName\": \"Supervisor QA (Juez LLM)\",\n  \"systemPromptSnapshot\": \"v9.0_governance_prompt_zdr_hash_7c2b\",\n  \"confidenceScore\": Number(($('Supervisor QA (Juez LLM)').item.json.output.exactitud_factual / 5).toFixed(2)),\n  \"toolOutput\": {\n    \"agent_verdict\": $('Supervisor QA (Juez LLM)').item.json.output.estado_veredicto,\n    \"factual_score\": $('Supervisor QA (Juez LLM)').item.json.output.exactitud_factual,\n    \"feedback\": $('Supervisor QA (Juez LLM)').item.json.output.critica_diagnostico\n  },\n  \"financialAudit\": {\n    \"latencyMs\": $json.latencyMs,\n    \"promptTokens\": $json.promptTokensEst,\n    \"completionTokens\": $json.completionTokensEst,\n    \"totalCostUsd\": $json.totalCostUsd,\n    \"zdr_status\": \"ENFORCED\"\n  }\n} }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1728,
+        -16
+      ],
+      "id": "161c6568-cde8-4010-8b60-fcfd33a02b49",
+      "name": "Esquema Logs JSON (Machine-Processable)"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Supervisor QA (Juez LLM)').item.json.output.estado_veredicto }}",
+                    "rightValue": "ACEPTADO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ACEPTADO"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Supervisor QA (Juez LLM)').item.json.output.estado_veredicto }}",
+                    "rightValue": "CORREGIR",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "CORREGIR"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Supervisor QA (Juez LLM)').item.json.output.estado_veredicto }}",
+                    "rightValue": "RECHAZADO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "RECHAZADO"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -1488,
+        -16
+      ],
+      "id": "72e7aa00-8d78-4fcd-8713-823e629026d6",
+      "name": "Switch — Veredicto Gobernanza"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1vkdd2JHXID2scymIqEpJKOf2ou6JzygbMWFSY6UDGI8/edit?usp=sharing",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1vkdd2JHXID2scymIqEpJKOf2ou6JzygbMWFSY6UDGI8/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Session_ID": "={{ $json.structured_log.traceId }}",
+            "Estado_del_Caso": "={{ $json.structured_log.toolOutput.agent_verdict }}",
+            "Resumen_Consolidado": "={{ $json.structured_log.toolOutput.feedback }}",
+            "Total_Mensaje": "={{ $json.structured_log.financialAudit.totalCostUsd }}",
+            "Nombre_Usuario": "={{ (() => { try { const raw = $('Manager Triaje (Intent & Answer)').item.json.output.replace(/```json\\n?|```/g, '').trim(); return JSON.parse(raw).client_name; } catch(e) { return 'Contacto Web'; } })() }}",
+            "Fecha_Actualizacion": "={{ $now.toFormat('yyyy-MM-dd HH:mm:ss') }}",
+            "Datos_Clave": "={{ 'Latencia: ' + $json.structured_log.financialAudit.latencyMs + 'ms | Tokens: ' + ($json.structured_log.financialAudit.promptTokens + $json.structured_log.financialAudit.completionTokens) + ' | ZDR: ' + $json.structured_log.financialAudit.zdr_status }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Session_ID",
+              "displayName": "Session_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nombre_Usuario",
+              "displayName": "Nombre_Usuario",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Fecha_Actualizacion",
+              "displayName": "Fecha_Actualizacion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Resumen_Consolidado",
+              "displayName": "Resumen_Consolidado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Estado_del_Caso",
+              "displayName": "Estado_del_Caso",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Datos_Clave",
+              "displayName": "Datos_Clave",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Total_Mensaje",
+              "displayName": "Total_Mensaje",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "output",
+              "displayName": "output",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -1232,
+        -176
+      ],
+      "id": "e626bb4d-99b2-4c65-8ea3-5aefd8e28143",
+      "name": "Log Auditoría & Costos (Sheets)",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "3H04j9s9OmJYzJtV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BTYH98HNJ",
+          "mode": "list",
+          "cachedResultName": "alertas-sales-ops"
+        },
+        "text": "=🛡️ *[GOBERNANZA IA - ALERTA HITL]*\n\n• *Trace ID:* `{{ $json.structured_log.traceId }}`\n• *Veredicto:* `{{ $json.structured_log.toolOutput.agent_verdict }}` (Score: {{ $json.structured_log.toolOutput.factual_score }}/5)\n• *Diagnóstico:* {{ $json.structured_log.toolOutput.feedback }}\n• *Costo Corrida:* ${{ $json.structured_log.financialAudit.totalCostUsd }} USD\n\n_Acción pausada por guardrail ético/ciberseguridad._",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        -1232,
+        96
+      ],
+      "id": "0212eb24-3218-4743-aff2-68c912242df5",
+      "name": "Slack — Alerta Gobernanza (HITL)",
+      "webhookId": "a6dbaa14-9961-4dab-bd99-1288e462a469",
+      "credentials": {
+        "slackApi": {
+          "id": "ONCoiDrt3WjxUrMh",
+          "name": "Slack account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Chat Trigger (Inbound)": {
+      "main": [
+        [
+          {
+            "node": "Generador de traceId & Timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generador de traceId & Timestamp": {
+      "main": [
+        [
+          {
+            "node": "Manager Triaje (Intent & Answer)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini (Manager)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Manager Triaje (Intent & Answer)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manager Triaje (Intent & Answer)": {
+      "main": [
+        [
+          {
+            "node": "Supervisor QA (Juez LLM)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini (Modelo Juez)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Supervisor QA (Juez LLM)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser (JSON Schema)": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Supervisor QA (Juez LLM)",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supervisor QA (Juez LLM)": {
+      "main": [
+        [
+          {
+            "node": "Calculadora Financiera (Tokens & TCO)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculadora Financiera (Tokens & TCO)": {
+      "main": [
+        [
+          {
+            "node": "Esquema Logs JSON (Machine-Processable)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Esquema Logs JSON (Machine-Processable)": {
+      "main": [
+        [
+          {
+            "node": "Switch — Veredicto Gobernanza",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch — Veredicto Gobernanza": {
+      "main": [
+        [
+          {
+            "node": "Log Auditoría & Costos (Sheets)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack — Alerta Gobernanza (HITL)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack — Alerta Gobernanza (HITL)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "b97f40ae-2d88-4b40-b5a0-47876fe08567",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "412e8a3a482fb7dda0fe855b6f1d8e950a244984215d34bfcb3c8e94ba12675c"
+  },
+  "id": "vYr1h5fo2hp8UCE0",
+  "tags": []
+}
