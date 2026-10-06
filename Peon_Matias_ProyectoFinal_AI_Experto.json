@@ -1,0 +1,863 @@
+{
+  "name": "Peon_Matias_ProyectoFinal_AI_Experto",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook-agente-inbound",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -416,
+        368
+      ],
+      "id": "463896cc-97c4-420e-be19-b10c948e5ad0",
+      "name": "Webhook Inbound Trigger",
+      "webhookId": "agente-inbound-prod"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "t1",
+              "name": "traceId",
+              "value": "=trc_{{ $now.format('X') }}_{{ $execution.id }}",
+              "type": "string"
+            },
+            {
+              "id": "t2",
+              "name": "client_name",
+              "value": "={{ $json.body.client_name || 'Desconocido' }}",
+              "type": "string"
+            },
+            {
+              "id": "t3",
+              "name": "client_email",
+              "value": "={{ $json.body.client_email || 'usuario@empresa.com' }}",
+              "type": "string"
+            },
+            {
+              "id": "t4",
+              "name": "raw_query",
+              "value": "={{ $json.body.message || $json.body.query || 'Consulta general' }}",
+              "type": "string"
+            },
+            {
+              "id": "t5",
+              "name": "reintentos",
+              "value": 0,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -208,
+        368
+      ],
+      "id": "6636c325-117c-4d0c-ada0-748a41e5cb0c",
+      "name": "Init Metadata & TraceId"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"received\",\n  \"message\": \"Solicitud recibida correctamente. Procesando en segundo plano de forma asincrónica.\",\n  \"traceId\": \"{{ $('Init Metadata & TraceId').item.json.traceId }}\",\n  \"timestamp\": \"{{ $now.toISO() }}\"\n}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        224
+      ],
+      "id": "51b01203-bb79-4f05-af49-56785560fdeb",
+      "name": "Acuse Asincrónico (200 OK)"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Procesa la siguiente solicitud del cliente:\n- CLIENTE: {{ $json.client_name }} ({{ $json.client_email }})\n- CONSULTA: {{ $json.raw_query }}\n- TRACE_ID: {{ $json.traceId }}",
+        "options": {
+          "systemMessage": "# ROL Y OBJETIVO\nEres el Agente Manager Orquestador y Motor de Conocimiento Organizacional. Responde a las consultas del cliente basándote estrictamente en los documentos institucionales recuperados mediante la herramienta Vector Store.\n\n# REGLAS ESTRICTAS DE RESPUESTA (ANTI-ALUCINACIÓN)\n1. Basa tus respuestas al 100% en los fragmentos recuperados del Vector Store.\n2. Cita siempre textualmente la fuente con sus metadatos (sección, cláusula o manual) en cada afirmación técnica o comercial.\n3. Prohibido deducir, asumir o inventar información fuera de catálogo.\n4. REGLA DORADA DE CONTINGENCIA: Si la información no figura en los fragmentos recuperados, responde única y textualmente: \"No sé\".\n5. Si el cliente solicita cotización o registro, prepara la propuesta orientada a registrar sus datos para el equipo de ventas conforme al manual de operaciones.",
+          "maxIterations": 5
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        0,
+        496
+      ],
+      "id": "361a778b-4bf9-407e-9c7c-5855892e735f",
+      "name": "Manager & RAG Knowledge Engine"
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -96,
+        704
+      ],
+      "id": "d73d5c4d-dc86-4af5-a123-26f4fd0913c3",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "E6qPzkAcy5YIlKii",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "vector_store_retriever",
+        "description": "Herramienta de búsqueda en el Vector Store corporativo. Consulta la base de conocimiento de políticas operativas, reembolsos, garantías, plazos y condiciones del servicio.",
+        "topK": 3
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
+      "typeVersion": 1,
+      "position": [
+        128,
+        704
+      ],
+      "id": "86e12279-6bc5-4661-8a8f-0354fdf3c24b",
+      "name": "Vector Store Retrieve Tool"
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemory",
+      "typeVersion": 1,
+      "position": [
+        0,
+        928
+      ],
+      "id": "845ebc9f-7456-495b-b545-7e4852dec2ca",
+      "name": "In-Memory Vector Store"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Audita la propuesta de interacción generada frente a la consulta del usuario y las normas corporativas:\n\n- CONSULTA USUARIO: {{ $('Init Metadata & TraceId').item.json.raw_query }}\n- RESPUESTA PROPUESTA: {{ $json.output }}\n- TRACE_ID: {{ $('Init Metadata & TraceId').item.json.traceId }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "# ROL Y OBJETIVO\nEres el Supervisor de Calidad y Juez Analítico (AI-as-a-Judge). Audita con rigor factual la respuesta generada frente a las directivas corporativas y el requerimiento original.\n\n# RÚBRICA FACTUAL (1 a 5)\n- 5: Perfecta concordancia factual, cita fuentes con metadatos reales o aplica limpiamente la contingencia 'No sé'. Cero alucinación.\n- 4: Precisión sólida con desviaciones menores de formato o estilo.\n- 3: Faltan matices, datos incompletos o ambigüedad conceptual reparable.\n- 2: Contradicción parcial o afirmaciones no verificables.\n- 1: Alucinación severa, promesas de descuentos/reembolsos indebidos o violación de normas.\n\n# UMBRALES DE VEREDICTO\n- exactitud_factual >= 4  --> estado_veredicto: \"ACEPTADO\"\n- exactitud_factual == 3  --> estado_veredicto: \"CORREGIR\"\n- exactitud_factual <= 2  --> estado_veredicto: \"RECHAZADO\"\n\nDevuelve ÚNICAMENTE el esquema estructurado JSON forzado."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        448,
+        496
+      ],
+      "id": "c6118285-8160-474b-81cb-8fcadd258004",
+      "name": "Supervisor QA (AI-as-a-Judge)"
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        432,
+        720
+      ],
+      "id": "e9ab9744-0780-4b30-ac33-8b6818ad43a2",
+      "name": "Google Gemini (Modelo Juez)",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "E6qPzkAcy5YIlKii",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"title\": \"VeredictoJuezQA\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"exactitud_factual\": {\n      \"type\": \"integer\",\n      \"minimum\": 1,\n      \"maximum\": 5,\n      \"description\": \"Calificación numérica del 1 al 5 asignada según exactitud y apego a políticas.\"\n    },\n    \"estado_veredicto\": {\n      \"type\": \"string\",\n      \"enum\": [\"ACEPTADO\", \"CORREGIR\", \"RECHAZADO\"],\n      \"description\": \"Comando de enrutamiento determinista para el Switch.\"\n    },\n    \"critica_diagnostico\": {\n      \"type\": \"string\",\n      \"description\": \"Diagnóstico analítico del veredicto o instrucciones de refinamiento.\"\n    }\n  },\n  \"required\": [\"exactitud_factual\", \"estado_veredicto\", \"critica_diagnostico\"],\n  \"additionalProperties\": false\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        608,
+        720
+      ],
+      "id": "a4cd8b66-8360-46f4-8a31-6059ef127d57",
+      "name": "Structured Output Parser (QA Schema)"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output ? $json.output.estado_veredicto : $json.estado_veredicto }}",
+                    "rightValue": "ACEPTADO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ACEPTADO"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output ? $json.output.estado_veredicto : $json.estado_veredicto }}",
+                    "rightValue": "CORREGIR",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "CORREGIR"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output ? $json.output.estado_veredicto : $json.estado_veredicto }}",
+                    "rightValue": "RECHAZADO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "RECHAZADO"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        768,
+        496
+      ],
+      "id": "c74c56f6-fdce-4c59-a0e8-3cfd68d723e2",
+      "name": "Switch — Veredicto QA"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1vkdd2JHXID2scymIqEpJKOf2ou6JzygbMWFSY6UDGI8/edit?usp=sharing",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1vkdd2JHXID2scymIqEpJKOf2ou6JzygbMWFSY6UDGI8/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1024,
+        288
+      ],
+      "id": "bfa11874-24ce-45b4-9a8b-ebc92565931d",
+      "name": "Look up (Idempotencia)",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "3H04j9s9OmJYzJtV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "idemp-check",
+              "leftValue": "={{ $json.Session_ID }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1248,
+        144
+      ],
+      "id": "1c2fcbeb-cd1e-47c1-83b2-ef701cae23d5",
+      "name": "IF — ¿Ya Existe Registro?"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1vkdd2JHXID2scymIqEpJKOf2ou6JzygbMWFSY6UDGI8/edit?usp=sharing",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1vkdd2JHXID2scymIqEpJKOf2ou6JzygbMWFSY6UDGI8/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Session_ID": "={{ $('Init Metadata & TraceId').item.json.traceId }}",
+            "Nombre_Usuario": "={{ $('Init Metadata & TraceId').item.json.client_name }}",
+            "Estado_del_Caso": "APROBADO_QA",
+            "Resumen_Consolidado": "={{ $('Manager & RAG Knowledge Engine').item.json.output }}",
+            "Total_Mensaje": "={{ $('Supervisor QA (AI-as-a-Judge)').item.json.output ? $('Supervisor QA (AI-as-a-Judge)').item.json.output.exactitud_factual : $('Supervisor QA (AI-as-a-Judge)').item.json.exactitud_factual }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Session_ID",
+              "displayName": "Session_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nombre_Usuario",
+              "displayName": "Nombre_Usuario",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Fecha_Actualizacion",
+              "displayName": "Fecha_Actualizacion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Resumen_Consolidado",
+              "displayName": "Resumen_Consolidado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Estado_del_Caso",
+              "displayName": "Estado_del_Caso",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Datos_Clave",
+              "displayName": "Datos_Clave",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Total_Mensaje",
+              "displayName": "Total_Mensaje",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1456,
+        256
+      ],
+      "id": "bbdd6c6c-32fe-41a0-8e14-215ea2de1dce",
+      "name": "Log CRM (Sheets Aprobado)",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "3H04j9s9OmJYzJtV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "=Respuesta a su consulta [{{ $('Init Metadata & TraceId').item.json.traceId }}]",
+        "message": "={{ $('Manager & RAG Knowledge Engine').item.json.output }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1696,
+        256
+      ],
+      "id": "c632d2d2-5ae4-43dc-a819-f1b006908843",
+      "name": "Create Draft (Gmail)",
+      "webhookId": "22cbc59e-0f1b-4ed5-b7a6-c65149abdfc0",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D9XLF3ppzyWzdeQw",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "max-retries-limit",
+              "leftValue": "={{ Number($('Init Metadata & TraceId').item.json.reintentos || 0) }}",
+              "rightValue": 2,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1024,
+        480
+      ],
+      "id": "eb710a83-8b4d-4a6e-b26b-d23761dd4f9d",
+      "name": "IF — ¿Menor a 2 Reintentos?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "critica_feedback",
+              "value": "={{ $('Supervisor QA (AI-as-a-Judge)').item.json.output ? $('Supervisor QA (AI-as-a-Judge)').item.json.output.critica_diagnostico : $('Supervisor QA (AI-as-a-Judge)').item.json.critica_diagnostico }}",
+              "type": "string"
+            },
+            {
+              "id": "s2",
+              "name": "reintentos",
+              "value": "={{ Number($('Init Metadata & TraceId').item.json.reintentos || 0) + 1 }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1456,
+        464
+      ],
+      "id": "2fc77500-6d25-4528-8093-9422d3d8d946",
+      "name": "Self-Healing (Feedback Loop)"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BTYH98HNJ",
+          "mode": "list",
+          "cachedResultName": "alertas-sales-ops"
+        },
+        "text": "=🛑 *[ESCALAMIENTO HITL] Alerta de Gobernanza - Rechazo por Supervisor*\n\n• *TraceId:* {{ $('Init Metadata & TraceId').item.json.traceId }}\n• *Score Factual:* {{ $('Supervisor QA (AI-as-a-Judge)').item.json.output ? $('Supervisor QA (AI-as-a-Judge)').item.json.output.exactitud_factual : $('Supervisor QA (AI-as-a-Judge)').item.json.exactitud_factual }}/5\n• *Diagnóstico del Juez:* {{ $('Supervisor QA (AI-as-a-Judge)').item.json.output ? $('Supervisor QA (AI-as-a-Judge)').item.json.output.critica_diagnostico : $('Supervisor QA (AI-as-a-Judge)').item.json.critica_diagnostico }}\n• *Consulta Cliente:* {{ $('Init Metadata & TraceId').item.json.raw_query }}\n• *Propuesta Observada:* {{ $('Manager & RAG Knowledge Engine').item.json.output }}\n\n_Ejecución pausada. Requiere aprobación o intervención humana._",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1296,
+        752
+      ],
+      "id": "e9db1245-5374-4dbd-b6c2-eed6f6984e07",
+      "name": "Slack — Alerta HITL (Rechazo)",
+      "webhookId": "65f9f1e7-65db-4962-87c0-2781922a7b22",
+      "credentials": {
+        "slackApi": {
+          "id": "ONCoiDrt3WjxUrMh",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1520,
+        752
+      ],
+      "id": "329fad97-a1ff-4d98-883d-23e0f037d51f",
+      "name": "Wait — Pausar Ejecución (HITL)",
+      "webhookId": "hitl-approval-final"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        304,
+        928
+      ],
+      "id": "2877be12-f3b3-4ad6-83a7-1163d399d503",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "flAKHAdCow1cz7nF",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "embed-multilingual-v3.0"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsCohere",
+      "typeVersion": 1,
+      "position": [
+        -160,
+        1104
+      ],
+      "id": "d854abb8-7296-4309-a576-2f508589be5f",
+      "name": "Embeddings Cohere",
+      "credentials": {
+        "cohereApi": {
+          "id": "HSNHlVsBJghEJP0w",
+          "name": "Cohere account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Inbound Trigger": {
+      "main": [
+        [
+          {
+            "node": "Init Metadata & TraceId",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Init Metadata & TraceId": {
+      "main": [
+        [
+          {
+            "node": "Acuse Asincrónico (200 OK)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Manager & RAG Knowledge Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Manager & RAG Knowledge Engine",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vector Store Retrieve Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Manager & RAG Knowledge Engine",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "In-Memory Vector Store": {
+      "ai_vectorStore": [
+        [
+          {
+            "node": "Vector Store Retrieve Tool",
+            "type": "ai_vectorStore",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manager & RAG Knowledge Engine": {
+      "main": [
+        [
+          {
+            "node": "Supervisor QA (AI-as-a-Judge)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini (Modelo Juez)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Supervisor QA (AI-as-a-Judge)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser (QA Schema)": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Supervisor QA (AI-as-a-Judge)",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supervisor QA (AI-as-a-Judge)": {
+      "main": [
+        [
+          {
+            "node": "Switch — Veredicto QA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch — Veredicto QA": {
+      "main": [
+        [
+          {
+            "node": "Look up (Idempotencia)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF — ¿Menor a 2 Reintentos?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack — Alerta HITL (Rechazo)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Look up (Idempotencia)": {
+      "main": [
+        [
+          {
+            "node": "IF — ¿Ya Existe Registro?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — ¿Ya Existe Registro?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Log CRM (Sheets Aprobado)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log CRM (Sheets Aprobado)": {
+      "main": [
+        [
+          {
+            "node": "Create Draft (Gmail)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — ¿Menor a 2 Reintentos?": {
+      "main": [
+        [
+          {
+            "node": "Self-Healing (Feedback Loop)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack — Alerta HITL (Rechazo)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack — Alerta HITL (Rechazo)": {
+      "main": [
+        [
+          {
+            "node": "Wait — Pausar Ejecución (HITL)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Vector Store Retrieve Tool",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Cohere": {
+      "ai_embedding": [
+        [
+          {
+            "node": "In-Memory Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "9a56a3ee-8ce1-48a6-bead-89d6181fa857",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "412e8a3a482fb7dda0fe855b6f1d8e950a244984215d34bfcb3c8e94ba12675c"
+  },
+  "id": "zRzb0ji9dYtBLZkN",
+  "tags": []
+}
